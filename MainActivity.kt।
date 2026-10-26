@@ -1,0 +1,203 @@
+package com.example.studyapp
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+
+data class Flashcard(val question: String, val answer: String)
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    StudyScreen()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StudyScreen() {
+    // Sample Study Flashcards
+    val flashcards = remember {
+        listOf(
+            Flashcard("What is the capital of France?", "Paris"),
+            Flashcard("What is Kotlin?", "A modern, statically typed programming language used for Android."),
+            Flashcard("What is 12 x 12?", "144"),
+            Flashcard("Who developed the theory of relativity?", "Albert Einstein")
+        )
+    }
+
+    var currentIndex by remember { mutableIntStateOf(0) }
+    var isFlipped by remember { mutableStateOf(false) }
+
+    // Timer States
+    var secondsLeft by remember { mutableIntStateOf(25 * 60) } // 25 minutes
+    var isTimerRunning by remember { mutableStateOf(false) }
+
+    // Timer Logic
+    LaunchedEffect(isTimerRunning, secondsLeft) {
+        if (isTimerRunning && secondsLeft > 0) {
+            delay(1000L)
+            secondsLeft--
+        } else if (secondsLeft == 0) {
+            isTimerRunning = false
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // --- 1. Study Timer Header ---
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val minutes = secondsLeft / 60
+                val seconds = secondsLeft % 60
+                Text(
+                    text = String.format("%02d:%02d", minutes, seconds),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                Row {
+                    IconButton(onClick = { isTimerRunning = !isTimerRunning }) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = if (isTimerRunning) "Pause" else "Start"
+                        )
+                    }
+                    IconButton(onClick = {
+                        isTimerRunning = false
+                        secondsLeft = 25 * 60
+                    }) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Reset Timer")
+                    }
+                }
+            }
+        }
+
+        // --- 2. Flip Flashcard ---
+        val rotation by animateFloatAsState(
+            targetValue = if (isFlipped) 180f else 0f,
+            animationSpec = tween(500),
+            label = "CardFlip"
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp)
+                .graphicsLayer {
+                    rotationY = rotation
+                    cameraDistance = 12f * density
+                }
+                .clickable { isFlipped = !isFlipped },
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isFlipped) MaterialTheme.colorScheme.tertiaryContainer 
+                                 else MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // If rotated more than 90 degrees, show the answer
+                if (rotation >= 90f) {
+                    Text(
+                        text = flashcards[currentIndex].answer,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.graphicsLayer { rotationY = 180f } // Flips text back to normal
+                    )
+                } else {
+                    Text(
+                        text = flashcards[currentIndex].question,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = "Tap card to flip • Card ${currentIndex + 1} of ${flashcards.size}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // --- 3. Navigation Controls ---
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Button(
+                onClick = {
+                    if (currentIndex > 0) {
+                        isFlipped = false
+                        currentIndex--
+                    }
+                },
+                enabled = currentIndex > 0
+            ) {
+                Text("Previous")
+            }
+
+            Button(
+                onClick = {
+                    if (currentIndex < flashcards.size - 1) {
+                        isFlipped = false
+                        currentIndex++
+                    }
+                },
+                enabled = currentIndex < flashcards.size - 1
+            ) {
+                Text("Next")
+            }
+        }
+    }
+}
